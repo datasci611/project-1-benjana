@@ -1,0 +1,268 @@
+---
+title: "Project 1 BIOS 611"
+author: "Benjana Guraziu"
+date: "`r format(Sys.time(), '%m/%d/%Y')`"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+library(tidyverse)
+library(hexbin)
+library(ggridges)
+
+```
+
+
+## Vitamin C's effect on Tooth Growth
+
+Did you know that Vitamin C helps your guinea pig's teeth grow? But how much Vitamin C actually makes a difference, and what's the best way to feed it to your pet? [Crampton, E. W.](https://www-cabdirect-org.libproxy.lib.unc.edu/cabdirect/abstract/19471401875) studied the effect of Vitamin C on incisor tooth growth in guinea pigs in 1947. He fed a group of 60 guinea pigs diets with three different levels of Vitamin C. He also tested whether Ascorbic Acid or good old Orange Juice would be more effective in delivering Vitamin C to help tooth growth. As you can see in the figure below, overall more Vitamin C helped teeth grow more. It also seems like Orange Juice is usually a better delivery method of Vitamin C than Ascorbic Acid at the different dosage levels. 
+
+```{r}
+## All datasets in this post are from R
+data("ToothGrowth")
+
+## Converting the "dose" variable to a factor will make it easier to work with it in a boxplot
+tooth_growth <- as_tibble(ToothGrowth) %>% 
+  mutate(dose = factor(dose))
+
+## I want to look at the boxplot of the 6 different experimental groups: two methods of Vitamin C intake, and three dosage levels for each. So, I've faceted by method of intake, and then plotted the quintile levels for the three doses of each. 
+ggplot(tooth_growth, aes(dose, len, color = dose)) +
+    geom_boxplot() +
+    facet_grid(. ~ supp, labeller = labeller(
+      supp = c(OJ = "Orange Juice", VC = "Ascorbic Acid"))) +
+    geom_jitter(width = .1) +
+    labs(
+          color = "Dose Level (mg/day)",
+          x = "Dose of vitamin C, in mg/day",
+          y = "Length of tooth growth cells, in microns",
+          title = "Overall Effect of Vitamin C on Tooth Growth in Guinea Pigs",
+          subtitle = "Comparing two different delivery methods and three different doses")
+
+```
+
+However, it might be helpful to look at the densities of the data points as well, for a clearer idea of how much the data actually supports our conclusions. As you can see in the figure and table below, there is actually a fair amount of variation of the amount of tooth growth measured within the groups of doses and delivery methods. By only studying 60 guinea pigs, the scientist could only measure the effects on 10 guinea pigs in each group. A good step further in this study would be to increase the number of guinea pigs studied, and perhaps to see if even larger doses of Vitamin C would have further effects on tooth growth. 
+
+```{r}
+## Very similar to the graph above, but this time looking at the density with violin plots
+ggplot(tooth_growth, aes(dose, len, color = dose)) +
+    geom_violin() +
+    facet_grid(. ~ supp, labeller = labeller(
+        supp = c(OJ = "Orange Juice", VC = "Ascorbic Acid"))) +
+    geom_jitter(width = .1) +
+    labs(
+          color = "Dose Level (mg/day)",
+          x = "Dose of vitamin C, in mg/day",
+          y = "Length of tooth growth cells, in microns",
+          title = "Density Plot of Effect of Vitamin C on Tooth Growth in Guinea Pigs",
+          subtitle = "Comparing two different delivery methods and three different doses")
+
+## I'm curious how the mean and standard deviation of the different groups look. The variance seems high. 
+tooth_growth %>% 
+  group_by(supp, dose) %>% 
+  summarise(mean_growth = mean(len), standard_deviation = sd(len))
+```
+
+And don't forget to give your guinea pig some OJ, around 2mg each day!
+
+
+## The Most Valuable Diamonds
+
+What makes the most expensive diamonds so valuable? What are the characteristics of the most expensive diamonds? We can look at a dataset of almost 54,000 round cut diamonds to see what traits they exhibit. The 5% most expensive diamonds from this dataset are those that cost more than `r quantile(diamonds$price, probs = .95)[[1]]` US dollars. 
+
+The diamond characteristics that most consumers are familiar with are carat and cut, so let's take a look at the relationship between those and jewel price. 
+
+```{r}
+## The diamonds dataset has a lot of information, but I want to cut it down to just the most valuable, so all the diamonds at the 95th percentile and up.
+valuable_diamonds <- diamonds %>% 
+  mutate(top = ifelse(.$price >= quantile(.$price, probs = .95), TRUE, FALSE)) %>% 
+  filter(top == TRUE)
+
+
+## There tends to be a lot of data points in this dataset, so I'm going to use hexagon bining to give me a heatmap of my points, so that data doesn't get lost in overlapping points. 
+ggplot(valuable_diamonds, aes(carat, price)) +
+  geom_hex() +
+  facet_wrap(.~ cut, scales = "free_x") +
+  labs(
+          x = "Carats (axis not fixed)",
+          y = "Price in US Dollars (axis fixed)",
+          title = "Price per Diamond, by Carat and Cut",
+          subtitle = "Most valuable diamonds have the better cuts, and the plurality seem to be around 2 carats") +
+  theme_bw()
+
+```
+
+Perhaps not surprisingly, most of the priciest diamonds fall in the better cut categories, Very Good, Premium, and Ideal. We can also see here that most of our diamonds fall on the 1.5 and 2 carat measure. The ratio of larger to smaller carats in the Ideal diamond cut doesn't seem to be significantly bigger than in the other cuts. To see if we can spot a trend in diamond prices, we can plot even more characteristics, including the color of the diamonds (varying from D, the best, to J, the worst). We can also look at the total depth percentage of the diamond, which is calculated by dividing the depth of the stone in mm by the average of the length and width in mm. 
+
+```{r}
+## I want to explore more characteristics of my dataset, so I'll facet even more, by both color and cut, and display the depth variable using color. 
+ggplot(valuable_diamonds, aes(carat, price, color = depth)) +  
+  geom_jitter(alpha = .5, width = .6) +
+  facet_grid(color ~ cut, scales = "free_x") +
+  ## To better visualize the trend between price and carats, I have added a linear regression line. 
+  geom_smooth(method = lm, se = FALSE) +
+  labs(
+          x = "Carats (axis not fixed)",   
+          y = "Price in US Dollars (axis fixed)",
+          color = "Depth (total depth %)",
+          title = "Price per Diamond, by Carat, Cut, Color, and Depth Percentage",
+          subtitle = "Color varies from D, the best, to J, the worst") +
+  theme_bw()
+
+```
+
+We can clearly see a positive relationship between larger carat size and higher price. No matter what the cut or the color, this relationship almost always holds (and the only group in which it doesn't, Fair Cut and E color, has few points so this is not necessarily indicative). In this figure also, we see that the Very Good, Premium, and Ideal cuts have a higher representation among the most expensive diamonds. We don't however, see a clear trend between color and price. The color of the priciest diamonds seems to be fairly evenly distributed. Indeed we can see this in the following figure. The relationship between color and price that we are able to pick up, however, is that as we move from top to bottom on the grid above, so from the better colors to the worse colors, we see that the carat number tends to increase as well. This indicates that for a diamond of an inferior color to be worth a lot of money, it's carat size needs to be higher than a diamond of superior color. Or, it could also indicate it is harder to come by diamonds that have both high carat size and a desirable color. Similarly, the diamonds with the highest depth percentage tended to have Fair cuts, the least desirable cut. This indicates that the high depth percentage elevates the price of the inferior cuts, but is not necessary for the superior cuts.  
+
+```{r}
+## I'm curious about the distribution of the price of these diamonds by their color. 
+ggplot(valuable_diamonds, aes(x = price, y = color)) +
+  geom_density_ridges(bandwidth = 100, color = "white", fill = "light blue") +
+  labs(
+         x = "Price in USD",
+         y = "Color from D, the best, to J, the worst", 
+         title = "Distribution of the Price by Color"
+  )
+```
+
+So, we have found that the priciest diamonds tend to have larger carat sizes and have one of three most desirable cuts. However, there are also pricy diamonds that don't necessarily perform well in these categories, but make up for it with superior levels in other traits, such as color or depth percentage. 
+
+
+## How do Sepal and Petal Size Differ in Three Different Flowers
+
+A famous dataset records the measurements of petals and sepals (the usually green leaf-like things below petals on flowers) of three different species of iris. This dataset was collected by Edgar Anderson and looks at the species Iris setosa, versicolor, and virginica. What is the relationship between sepal and petal measurements? Is there correlation between petal length and petal width, and similarly for sepal length and width? Is there a correlation between petal length and sepal length? Which one would be most beautiful in a bouquet? 
+
+As a first pass, we can see how these four measurements are distributed, and notice that petal length and width seem to be bimodally distributed.  
+
+```{r}
+## To make this dataset easier to work with for this visualization, I want to group the four variables together, and then visualize their distributions on one plot
+iris %>% 
+  gather(key = flower_att, value = measurement,
+       Sepal.Length, Sepal.Width, Petal.Length, Petal.Width) %>% 
+  ggplot(aes(measurement, y = flower_att, x = measurement, fill = flower_att)) +
+  geom_density_ridges() +
+  theme_bw() +
+  labs(
+         x = "Measurement in cm",
+         y = "Object measured", 
+         title = "Distribution of the Measurements of Petals and Sepals in Irises"
+  )
+
+```
+
+Next, we can look at the relationship between petal length and width, and then between sepal length and width. 
+
+```{r}
+## Comparing petal length to petal width, and separating by species
+ggplot(iris, aes(Petal.Length, Petal.Width, color = Species)) +
+  geom_jitter() +
+  geom_smooth() +
+  labs(
+         x = "Petal Length, in cm",
+         y = "Petal Width, in cm", 
+         title = "Comparison of Petal Length and Width") +
+  theme_bw()
+
+## Comparing sepal length to sepal width, and separating by species
+ggplot(iris, aes(Sepal.Length, Sepal.Width, color = Species)) +
+  geom_jitter() +
+  geom_smooth() +
+  labs(
+         x = "Sepal Length, in cm",
+         y = "Sepal Width, in cm", 
+         title = "Comparison of Sepal Length and Width") +
+  theme_bw()
+```
+
+We can see that there is a positive relationship between both petal length and width, and betweeen sepal length and width. We can also clearly see that the sizes of the petals and sepals of the three different species are distinct, with the exception of the sepal measurements of Iris versicolor and virginica, which overlap quite a bit. Their petal measurements are also more similar to each other than to Iris setosa.  
+
+Finally, we can look at the relationship between petal length and sepal length. 
+
+```{r}
+## In this figure, I'm mostly interested in looking at the relationship between petal length and sepal length, but also adding in the width variables to see if something comes to light there. 
+ggplot(iris, aes(Sepal.Length, Petal.Length, color = Petal.Width)) +  
+  geom_jitter(aes(size = Sepal.Width), alpha = .5, width = .2) +
+  facet_wrap(.~ Species) +
+  geom_smooth(method = lm, se = FALSE) +
+  theme_bw() +
+  labs(
+         x = "Sepal Length, in cm",
+         y = "Petal Length, in cm", 
+         title = "Comparison of Sepal Length and Petal Length",
+         subtitle = "With some insight on their relationship to Sepal Width and Petal Width"
+  )
+
+```
+
+Here we also see a strong positive relationship between sepal length and petal length. This is most strong in Iris versicolor and virginica, but still present in Iris setosa. A look at petal and sepal width also echoes the relationship we observed earlier: Iris setosa has shorter petals than the other two species, and it also has narrower petals. Overall, we have found positive relationships between these measures, and can also conclude that the petals and sepals of Iris versicolor and virginica will look more similar to one another than Iris setosa. 
+
+So if you're buying an iris bouquet, look for Iris virginica for the biggest petals!
+
+## Swiss Fertility and Socioeconomic Indicators (1888) Data
+
+In 1888, fertility in Switzerland was beginning to fall, in a period called the *demographic transition*. We have access to data collected from 47 French-speaking provinces at this time, and include a common fertility measure, the proportion of live births who live less than 1 year, and finally the percentage of the population who are in argriculture, receive high marks on army exams, are educated beyond primary school, and are Catholic. 
+
+First, we can look at the relationship between fertility and infant mortality. 
+
+```{r}
+
+ggplot(swiss, aes(Fertility, Infant.Mortality)) +
+  geom_point() +
+  geom_smooth(method = lm) +
+  labs(
+         x = "Fertility, measured in Ig, a ‘common standardized fertility measure’",
+         y = "Proportion of live births who live less than 1 year", 
+         title = "Comparison between Fertility and Infant Mortality",
+         subtitle = "Higher fertility measures are positively correlated with higher proportions of infant mortality"
+  )
+```
+
+This figure might be initially surprising: it seems odd that higher fertility scores would be positively correlated with a greater proportion of infant mortality in the first year. One might expect that whatever factors driving fertility down would also act upon infant survival and bring it down as well, therefore bringing infant mortality up. However, this is not the case here. A reasonable explanation for this might be that more births were happening with higher fertility, so perhaps the babies were not being looked after as carefully and infant deaths increased. Or, it might be that completely different factors were acting on fertility and infant mortality. 
+
+Next, we can try to tease out any correlations between the socio-economic indicators and the fertility and infant mortality measures. 
+
+As a reminder, the Agriculture variable records the percent of males involved in agriculture as occupation, the Examination	variable measures the percent of draftees receiving highest mark on army examination, the Education variable measures the percent of draftees with education beyond primary school, and the Catholic variable records the percent of people who were Catholic (as opposed to Protestant).
+
+```{r}
+## I will gather my variables to make them easier to visualize
+swiss_new <- swiss %>% 
+  gather(key = Indicator, value = Percentage, -Fertility, - Infant.Mortality)
+
+ggplot(swiss_new, aes(Percentage, Fertility, color = Indicator)) +
+  geom_point() +
+  geom_smooth(se = FALSE) +
+  theme_bw() +
+  labs(title = "Fertility compared to Socio-Economic Indicators")
+  
+ggplot(swiss_new, aes(Percentage, Infant.Mortality, color = Indicator)) +
+  geom_point() +
+  geom_smooth(se = FALSE) +
+  theme_bw() +
+  labs(title = "Infant Mortality compared to Socio-Economic Indicators")
+
+ggplot(swiss_new, aes(Percentage, Infant.Mortality, color = Indicator)) +
+  geom_point() +
+  geom_smooth(se = FALSE) +
+  theme_bw() +
+  labs(title = "Infant Mortality compared to Socio-Economic Indicators")
+
+ggplot(swiss_new, aes(Percentage, Infant.Mortality, color = Indicator)) +
+  geom_point() +
+  geom_smooth(se = FALSE) +
+  facet_grid(.~ Indicator, scales = "free_x") +
+  theme_bw() +
+  labs(title = "Infant Mortality compared to Socio-Economic Indicators")
+```
+
+Unfortunately, most of the socio-economic indicators don't seem to have a strong relationship with fertility or infant mortality. We only have aggregate data, and to tease out subtle relationships such as these we would most likely benefit great from more individual level data. However, one relationship seems fairly strong: the higher the proportion of draftees who had education beyond primary school, the lower the fertility measure.  
+
+```{r}
+ggplot(swiss, aes(Education, Fertility)) +
+  geom_point() +
+  geom_smooth(method = lm) +
+  theme_bw() +
+  labs(title = "Infant Mortality compared to Proportion Educated Beyond Primary School")
+
+```
+
+This could be because the longer that people were in school, the longer they held off on having children, and potentially the fewer children they had. Presumably, the best thing for the Swiss to combat the lower fertility rates would have been to toss the books aside and leave school. 
